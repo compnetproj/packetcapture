@@ -86,7 +86,7 @@ void ethernet_packet(unsigned char* buf, int size)
 {
     struct ethhdr *eth = (struct ethhdr *)buf;
     print_ether_details(eth);
-    ethern[cnt]=(struct ethhdr *)malloc(sizeof(struct ethhdr));
+    ethern[cnt]=malloc(sizeof(struct ethhdr));
     ethern[cnt]->h_proto=eth->h_proto;
     for(i=0;i<6;i++)
     {
@@ -143,6 +143,15 @@ void PrintData(unsigned char* data , int size)
 
 void print_ip_details(struct iphdr* iph)
 {
+    unsigned short iphdrlen;
+    iphdrlen =iph->ihl*4;
+     
+    memset(&source, 0, sizeof(source));
+    source.sin_addr.s_addr = iph->saddr;
+     
+    memset(&dest, 0, sizeof(dest));
+    dest.sin_addr.s_addr = iph->daddr;
+
     fprintf(flog , "\n");
     fprintf(flog , "IP Header\n");
     fprintf(flog , "   Version        : %d\n",(unsigned int)iph->version);
@@ -194,7 +203,7 @@ void ip_packet(char* buf, int size)
 
     strcpy(Sour[cnt],inet_ntoa(source.sin_addr));
     strcpy(Dest[cnt],inet_ntoa(dest.sin_addr));
-    ipthern[cnt]=   (struct iphdr *)malloc( sizeof(struct iphdr));
+    ipthern[cnt]=   malloc( sizeof(struct iphdr));
     ipthern[cnt]->version=iph->version;
     ipthern[cnt]->ihl=iph->ihl;
     ipthern[cnt]->tos=iph->tos;
@@ -274,7 +283,7 @@ void udp_packet(unsigned char *buf , int size)
     fprintf(flog , "\n________________________________________________________________________________\n");
     por1[cnt]=ntohs(udph->source);
     por2[cnt]=ntohs(udph->dest);
-    udpthern[cnt] = (struct udphdr *)malloc(sizeof(struct udphdr));
+    udpthern[cnt] = malloc(sizeof(struct udphdr));
     udpthern[cnt]->source = udph->source;
     udpthern[cnt]->dest = udph->dest;
     udpthern[cnt]->len = udph->len;
@@ -354,7 +363,7 @@ void tcp_packet(unsigned char* buf, int size)
     fprintf(flog , "\n____________________________________________________________________________\n");
     por1[cnt] = ntohs(tcph->source);
     por2[cnt] = ntohs(tcph->dest);
-    tcpthern[cnt]=(struct tcphdr*) malloc(sizeof(struct tcphdr));
+    tcpthern[cnt]=malloc(sizeof(struct tcphdr));
     tcpthern[cnt]->source=tcph->source;
     tcpthern[cnt]->dest=tcph->dest;
     tcpthern[cnt]->seq=tcph->seq;
@@ -828,14 +837,12 @@ void filter()
             for(i=0;i<udp_count;i++)
             {
                 int v=udp_index[i];
-                printf("%d\n",v);
                 printf("%.2X-%.2X-%.2X-%.2X-%.2X-%.2X     %.2X-%.2X-%.2X-%.2X-%.2X-%.2X     %15s     %15s     %d     %d\n", ethern[v]->h_dest[0] , ethern[v]->h_dest[1] , ethern[v]->h_dest[2] , ethern[v]->h_dest[3] , ethern[v]->h_dest[4] , ethern[v]->h_dest[5],ethern[v]->h_source[0] , ethern[v]->h_source[1] , ethern[v]->h_source[2] , ethern[v]->h_source[3] , ethern[v]->h_source[4] , ethern[v]->h_source[5],Sour[v],Dest[v],por1[v],por2[v]);
                 usleep(1e5);    
             }
             for(i=0;i<tcp_count;i++)
             {
                 int v=tcp_index[i];
-                printf("%d\n",v);
                 printf("%.2X-%.2X-%.2X-%.2X-%.2X-%.2X     %.2X-%.2X-%.2X-%.2X-%.2X-%.2X     %15s     %15s     %d     %d\n", ethern[v]->h_dest[0] , ethern[v]->h_dest[1] , ethern[v]->h_dest[2] , ethern[v]->h_dest[3] , ethern[v]->h_dest[4] , ethern[v]->h_dest[5],ethern[v]->h_source[0] , ethern[v]->h_source[1] , ethern[v]->h_source[2] , ethern[v]->h_source[3] , ethern[v]->h_source[4] , ethern[v]->h_source[5],Sour[v],Dest[v],por1[v],por2[v]);
                 usleep(1e5);
             }   
@@ -1003,6 +1010,6 @@ void filter()
                     fprintf(flog,"######################################");
             }   
         }
+        fclose(flog);
     }
-    fclose(flog);
 }

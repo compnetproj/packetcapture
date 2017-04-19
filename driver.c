@@ -29,6 +29,14 @@ int main(int argc, char const *argv[])
 
     while(true)
     {
+
+        for(i=0;i<MAX;i++)
+        {
+            ethern[i]=NULL;
+            ipthern[i]=NULL;
+            tcpthern[i]=NULL;
+            udpthern[i]=NULL;
+        }
         tcp = udp = http = dns = ip = total = k = 0;
         ip_count = tcp_count = udp_count = 0;
         cnt = 0;
@@ -83,7 +91,29 @@ int main(int argc, char const *argv[])
         char c;
         printf("Do you want to capture more packets (Y/N) : ");
         scanf(" %c" , &c);
-
+        for(i=0;i<cnt;i++)
+        {
+            if(ethern[i]!=NULL)
+            {
+                free(ethern[i]);
+                ethern[i]=NULL;
+            }
+            if(ipthern[i]!=NULL)
+            {
+                free(ipthern[i]);
+                ipthern[i]=NULL;
+            } 
+            if(tcpthern[i]!=NULL)
+            {
+                free(tcpthern[i]);
+                tcpthern[i]=NULL;
+            }
+            if(udpthern[i]!=NULL)
+            {
+                free(udpthern[i]);
+                udpthern[i]=NULL;
+            }
+        }
         if(c == 'n' || c == 'N')
             break;
         
