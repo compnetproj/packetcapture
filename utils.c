@@ -15,7 +15,6 @@ static void interface(int fd, const char *name)
     printf("Interface : %-24s IP Address : %s\n", name, host);
 }
 
-
 static void list_all(int fd, void (*show)(int fd, const char *name)) 
 {
     struct ifreq *ir;
@@ -74,97 +73,95 @@ void protocol_hierarchy()
 	printf("NETWORK LAYER     : IP   - %d\n" , ip);
 }
 
-void print_ether_details(struct ethhdr* eth)
+void print_ether_details(ethernet* eptr)
 {
     fprintf(flog , "\n");
     fprintf(flog , "Ethernet Header\n");
-    fprintf(flog , "   Source Address      : %.2X-%.2X-%.2X-%.2X-%.2X-%.2X \n", eth->h_source[0] , eth->h_source[1] , eth->h_source[2] , eth->h_source[3] , eth->h_source[4] , eth->h_source[5] );
-    fprintf(flog , "   Destination Address : %.2X-%.2X-%.2X-%.2X-%.2X-%.2X \n", eth->h_dest[0] , eth->h_dest[1] , eth->h_dest[2] , eth->h_dest[3] , eth->h_dest[4] , eth->h_dest[5] );
-    fprintf(flog , "   Protocol            : %u \n",(unsigned short)eth->h_proto);
+    fprintf(flog , "   Source Address      : %.2X-%.2X-%.2X-%.2X-%.2X-%.2X \n", eptr->src[0] , eptr->src[1] , eptr->src[2] , eptr->src[3] , eptr->src[4] , eptr->src[5] );
+    fprintf(flog , "   Destination Address : %.2X-%.2X-%.2X-%.2X-%.2X-%.2X \n", eptr->dst[0] , eptr->dst[1] , eptr->dst[2] , eptr->dst[3] , eptr->dst[4] , eptr->dst[5] );
+    fprintf(flog , "   Protocol            : %u \n",eptr->protocol);
 }
+
+ethernet* get_ether_details(struct ethhdr* eth)
+{
+    ethernet* eptr = (ethernet*)malloc(sizeof(ethernet));
+    int i;
+    for(i = 0; i < 6; i++)
+    {
+        eptr->src[i] = eth->h_source[i];
+        eptr->dst[i] = eth->h_dest[i];
+    }
+    eptr->protocol = (unsigned short)eth->h_proto;
+    return eptr;
+}
+
 void ethernet_packet(unsigned char* buf, int size)
 {
     struct ethhdr *eth = (struct ethhdr *)buf;
-    print_ether_details(eth);
+    ethernet* eptr = get_ether_details(eth);
+    print_ether_details(eptr);
     ethern[cnt]=malloc(sizeof(struct ethhdr));
-    ethern[cnt]->h_proto=eth->h_proto;
+    ethern[cnt]->h_proto=eptr->protocol;
     for(i=0;i<6;i++)
     {
-        ethern[cnt]->h_dest[i]=eth->h_dest[i];
-        ethern[cnt]->h_source[i]=eth->h_source[i];
+        ethern[cnt]->h_dest[i]=eptr->dst[i];
+        ethern[cnt]->h_source[i]=eptr->src[i];
     }
+    free(eptr);
 }
 
 void PrintData(unsigned char* data , int size)
 {
-    int i , j;
-    for(i=0 ; i < size ; i++)
-    {
-        if( i!=0 && i%16==0)   
-        {
-            fprintf(flog , "         ");
-            for(j=i-16 ; j<i ; j++)
-            {
-                if(data[j]>=32 && data[j]<=128)
-                    fprintf(flog , "%c",(unsigned char)data[j]); 
-                else fprintf(flog , ".");
-            }
-            fprintf(flog , "\n");
-        } 
-         
-        if(i%16==0) fprintf(flog , "   ");
-            fprintf(flog , " %02X",(unsigned int)data[i]);
-                 
-        if( i==size-1) 
-        {
-            for(j=0;j<15-i%16;j++) 
-            {
-              fprintf(flog , "   "); 
-            }
-             
-            fprintf(flog , "         ");
-             
-            for(j=i-i%16 ; j<=i ; j++)
-            {
-                if(data[j]>=32 && data[j]<=128) 
-                {
-                  fprintf(flog , "%c",(unsigned char)data[j]);
-                }
-                else
-                {
-                  fprintf(flog , ".");
-                }
-            }
-             
-            fprintf(flog ,  "\n" );
-        }
+    int i,j;
+    fprintf(flog,"\nPacket data  \n");
+    for(i = 0 ; i < size ; i++)
+    { 
+        if(i % 80 == 0) fprintf(flog,"\n");  
+        if(data[i] >= 32 && data[i] <= 128)
+            fprintf(flog , "%c",(unsigned char)data[i]); 
+        else fprintf(flog , ".");
+
     }
+    fprintf(flog,"\n");
+           
 }
 
-void print_ip_details(struct iphdr* iph)
+void print_ip_details(ip_protocol* ipptr)
 {
-    unsigned short iphdrlen;
-    iphdrlen =iph->ihl*4;
-     
-    memset(&source, 0, sizeof(source));
-    source.sin_addr.s_addr = iph->saddr;
-     
-    memset(&dest, 0, sizeof(dest));
-    dest.sin_addr.s_addr = iph->daddr;
-
     fprintf(flog , "\n");
     fprintf(flog , "IP Header\n");
-    fprintf(flog , "   Version        : %d\n",(unsigned int)iph->version);
-    fprintf(flog , "   Header Length  : %d bytes\n",((unsigned int)(iph->ihl))*4);
-    fprintf(flog , "   TOS   : %d\n",(unsigned int)iph->tos);
-    fprintf(flog , "   Total Length   : %d  bytes\n",ntohs(iph->tot_len));
-    fprintf(flog , "   Identification    : %d\n",ntohs(iph->id));
-    fprintf(flog , "   Fragmentation offset    : %d\n" , iph->frag_off);
-    fprintf(flog , "   TTL      : %d\n",(unsigned int)iph->ttl);
-    fprintf(flog , "   Protocol : %d\n",(unsigned int)iph->protocol);
-    fprintf(flog , "   Checksum : %d\n",ntohs(iph->check));
-    fprintf(flog , "   Source IP Address       : %s\n",inet_ntoa(source.sin_addr));
-    fprintf(flog , "   Destination IP Address  : %s\n",inet_ntoa(dest.sin_addr));
+    fprintf(flog , "   Version        : %d\n",ipptr->version);
+    fprintf(flog , "   Header Length  : %d bytes\n",ipptr->headlen);
+    fprintf(flog , "   TOS   : %d\n",ipptr->service);
+    fprintf(flog , "   Total Length   : %d  bytes\n",ipptr->totlen);
+    fprintf(flog , "   Identification    : %d\n",ipptr->id);
+    fprintf(flog , "   Fragmentation offset    : %d\n" , ipptr->offset);
+    fprintf(flog , "   TTL      : %d\n",ipptr->time);
+    fprintf(flog , "   Protocol : %d\n",ipptr->protocol);
+    fprintf(flog , "   Checksum : %d\n",ipptr->checksum);
+    fprintf(flog , "   Source IP Address       : %s\n",ipptr->src);
+    fprintf(flog , "   Destination IP Address  : %s\n",ipptr->dst);
+}
+
+ip_protocol* get_ip_details(struct iphdr* iph)
+{
+    memset(&source, 0, sizeof(source));
+    source.sin_addr.s_addr = iph->saddr; 
+    memset(&dest, 0, sizeof(dest));
+    dest.sin_addr.s_addr = iph->daddr;
+    ip_protocol* ipptr = (ip_protocol*)malloc(sizeof(ip_protocol));
+    ipptr->version = (unsigned int)iph->version;
+    ipptr->headlen = ((unsigned int)(iph->ihl))*4;
+    ipptr->service = (unsigned int)iph->tos;
+    ipptr->totlen = ntohs(iph->tot_len);
+    ipptr->id = ntohs(iph->id);
+    ipptr->offset = iph->frag_off;
+    ipptr->time = (unsigned int)iph->ttl;
+    ipptr->protocol = (unsigned int)iph->protocol;
+    ipptr->checksum = ntohs(iph->check);
+    strcpy(ipptr->src,inet_ntoa(source.sin_addr));
+    strcpy(ipptr->dst,inet_ntoa(dest.sin_addr));
+    return ipptr;
 }
 
 void ip_packet(char* buf, int size)
@@ -175,56 +172,49 @@ void ip_packet(char* buf, int size)
     unsigned short iphdrlen;
          
     struct iphdr *iph = (struct iphdr *)(buf  + sizeof(struct ethhdr) );
-    iphdrlen =iph->ihl*4;
-     
-    memset(&source, 0, sizeof(source));
-    source.sin_addr.s_addr = iph->saddr;
-     
-    memset(&dest, 0, sizeof(dest));
-    dest.sin_addr.s_addr = iph->daddr;
+    iphdrlen = iph->ihl*4;
 
     fprintf(flog , "\n");
     fprintf(flog , "IP Header\n");
     PrintData(buf , iphdrlen);
-     
-    fprintf(flog , "\n");
-    fprintf(flog , "IP Header\n");
-    fprintf(flog , "   Version        : %d\n",(unsigned int)iph->version);
-    fprintf(flog , "   Header Length  : %d bytes\n",((unsigned int)(iph->ihl))*4);
-    fprintf(flog , "   TOS   : %d\n",(unsigned int)iph->tos);
-    fprintf(flog , "   Total Length   : %d  bytes\n",ntohs(iph->tot_len));
-    fprintf(flog , "   Identification    : %d\n",ntohs(iph->id));
-    fprintf(flog , "   Fragmentation offset    : %d\n" , iph->frag_off);
-    fprintf(flog , "   TTL      : %d\n",(unsigned int)iph->ttl);
-    fprintf(flog , "   Protocol : %d\n",(unsigned int)iph->protocol);
-    fprintf(flog , "   Checksum : %d\n",ntohs(iph->check));
-    fprintf(flog , "   Source IP Address       : %s\n",inet_ntoa(source.sin_addr));
-    fprintf(flog , "   Destination IP Address  : %s\n",inet_ntoa(dest.sin_addr));
+    ip_protocol* ipptr = get_ip_details(iph); 
+    print_ip_details(ipptr);
 
-    strcpy(Sour[cnt],inet_ntoa(source.sin_addr));
-    strcpy(Dest[cnt],inet_ntoa(dest.sin_addr));
+    strcpy(Sour[cnt],ipptr->src);
+    strcpy(Dest[cnt],ipptr->dst);
     ipthern[cnt]=   malloc( sizeof(struct iphdr));
-    ipthern[cnt]->version=iph->version;
-    ipthern[cnt]->ihl=iph->ihl;
-    ipthern[cnt]->tos=iph->tos;
-    ipthern[cnt]->tot_len=iph->tot_len;
-    ipthern[cnt]->id=iph->id;
-    ipthern[cnt]->frag_off=iph->frag_off;
-    ipthern[cnt]->ttl=iph->ttl;
-    ipthern[cnt]->protocol=iph->protocol;
-    ipthern[cnt]->check=iph->check;
+    ipthern[cnt]->version=ipptr->version;
+    ipthern[cnt]->ihl=ipptr->headlen;
+    ipthern[cnt]->tos=ipptr->service;
+    ipthern[cnt]->tot_len=ipptr->totlen;
+    ipthern[cnt]->id=ipptr->id;
+    ipthern[cnt]->frag_off=ipptr->offset;
+    ipthern[cnt]->ttl=ipptr->time;
+    ipthern[cnt]->protocol=ipptr->protocol;
+    ipthern[cnt]->check=ipptr->checksum;
     ipthern[cnt]->saddr=iph->saddr;
     ipthern[cnt]->daddr=iph->daddr;
+    free(ipptr);
 
 }
  
-void print_udp_details(struct udphdr * udph)
+void print_udp_details(udp_protocol* udpptr)
 {
     fprintf(flog , "\nUDP Header\n");
-    fprintf(flog , "   Source Port      : %d\n" , ntohs(udph->source));
-    fprintf(flog , "   Destination Port : %d\n" , ntohs(udph->dest));
-    fprintf(flog , "   Length       : %d\n" , ntohs(udph->len));
-    fprintf(flog , "   Checksum     : %d\n" , ntohs(udph->check));
+    fprintf(flog , "   Source Port      : %d\n" , udpptr->src);
+    fprintf(flog , "   Destination Port : %d\n" , udpptr->dst);
+    fprintf(flog , "   Length       : %d\n" , udpptr->len);
+    fprintf(flog , "   Checksum     : %d\n" , udpptr->checksum);
+}
+
+udp_protocol* get_udp_details(struct udphdr* udph)
+{
+    udp_protocol* udpptr = (udp_protocol*)malloc(sizeof(udp_protocol));
+    udpptr->src = ntohs(udph->source);
+    udpptr->dst = ntohs(udph->dest);
+    udpptr->len = ntohs(udph->len);
+    udpptr->checksum = ntohs(udph->check);
+    return udpptr;
 }
 
 void udp_packet(unsigned char *buf , int size)
@@ -259,12 +249,13 @@ void udp_packet(unsigned char *buf , int size)
         dn = true;
         // printf("DNS packet found  :  TCP : %4d  UDP : %4d  HTTP : %4d  DNS : %4d\r", tcp , udp , http , dns);    
     }               
-     
-    fprintf(flog , "\nUDP Header\n");
-    fprintf(flog , "   Source Port      : %d\n" , ntohs(udph->source));
-    fprintf(flog , "   Destination Port : %d\n" , ntohs(udph->dest));
-    fprintf(flog , "   Length       : %d\n" , ntohs(udph->len));
-    fprintf(flog , "   Checksum     : %d\n" , ntohs(udph->check));
+    udp_protocol* udpptr = get_udp_details(udph); 
+    print_udp_details(udpptr);
+
+    orig = ntohs(udph->check);
+    unsigned short s = compute_udp_checksum(iph,(unsigned short*)udph);
+    fprintf(flog , "   Calculated Checksum       : %d\n",ntohs(s));
+     a = ntohs(s);
    
     char pr[50];
 
@@ -288,22 +279,42 @@ void udp_packet(unsigned char *buf , int size)
     udpthern[cnt]->dest = udph->dest;
     udpthern[cnt]->len = udph->len;
     udpthern[cnt]->check = udph->check;
+    free(udpptr);
 } 
 
-void print_tcp_details(struct tcphdr* tcph)
+void print_tcp_details(tcp_protocol* tcpptr)
 {
     fprintf(flog , "\n");
     fprintf(flog , "TCP Header\n");
-    fprintf(flog , "   Source Port      : %u\n",ntohs(tcph->source));
-    fprintf(flog , "   Destination Port : %u\n",ntohs(tcph->dest));
-    fprintf(flog , "   Sequence Number    : %u\n",ntohl(tcph->seq));
-    fprintf(flog , "   Acknowledge Number : %u\n",ntohl(tcph->ack_seq));
-    fprintf(flog , "   Header Length      : %d BYTES\n" , (unsigned int)tcph->doff*4);
-    fprintf(flog , "   Flags (URG|ACK|PSH|RST|SYN|FIN)    : %d %d %d %d %d %d\n",(unsigned int)tcph->urg , (unsigned int)tcph->ack, (unsigned int)tcph->psh,(unsigned int)tcph->rst, (unsigned int)tcph->syn, (unsigned int)tcph->fin); 
-    fprintf(flog , "   Window         : %d\n",ntohs(tcph->window));
-    fprintf(flog , "   Checksum       : %d\n",ntohs(tcph->check));
-    fprintf(flog , "   Urgent Pointer : %d\n",tcph->urg_ptr);
-    
+    fprintf(flog , "   Source Port      : %u\n",tcpptr->src);
+    fprintf(flog , "   Destination Port : %u\n",tcpptr->dst);
+    fprintf(flog , "   Sequence Number    : %u\n",tcpptr->seq_no);
+    fprintf(flog , "   Acknowledge Number : %u\n",tcpptr->ack_no);
+    fprintf(flog , "   Header Length      : %d BYTES\n" , tcpptr->headlen);
+    fprintf(flog , "   Flags (URG|ACK|PSH|RST|SYN|FIN)    : %d %d %d %d %d %d\n",tcpptr->urgent, tcpptr->ack,tcpptr->push, tcpptr->reset, tcpptr->syn, tcpptr->fin); 
+    fprintf(flog , "   Window         : %d\n",tcpptr->window);
+    fprintf(flog , "   Checksum       : %d\n",tcpptr->checksum);
+    fprintf(flog , "   Urgent Pointer : %d\n",tcpptr->urgent_ptr);
+}
+
+tcp_protocol* get_tcp_details(struct tcphdr* tcph)
+{
+    tcp_protocol* tcpptr = (tcp_protocol*)malloc(sizeof(tcp_protocol));
+    tcpptr->src = ntohs(tcph->source);
+    tcpptr->dst = ntohs(tcph->dest);
+    tcpptr->seq_no = ntohl(tcph->seq);
+    tcpptr->ack_no = ntohl(tcph->ack_seq);
+    tcpptr->headlen = (unsigned int)tcph->doff*4;
+    tcpptr->urgent = (unsigned int)tcph->urg;
+    tcpptr->ack = (unsigned int)tcph->ack;
+    tcpptr->push = (unsigned int)tcph->psh;
+    tcpptr->reset = (unsigned int)tcph->rst;
+    tcpptr->syn = (unsigned int)tcph->syn;
+    tcpptr->fin = (unsigned int)tcph->fin;
+    tcpptr->window = ntohs(tcph->window);
+    tcpptr->checksum = ntohs(tcph->check);
+    tcpptr->urgent_ptr = tcph->urg_ptr;
+    return tcpptr;
 }
 
 void tcp_packet(unsigned char* buf, int size)
@@ -335,19 +346,14 @@ void tcp_packet(unsigned char* buf, int size)
         dn = true;
         // printf("DNS packet found  :  TCP : %4d  UDP : %4d  HTTP : %4d  DNS : %4d\r", tcp , udp , http , dns);    
     }      
+    tcp_protocol* tcpptr = get_tcp_details(tcph);
+    print_tcp_details(tcpptr);
 
-    fprintf(flog , "\n");
-    fprintf(flog , "TCP Header\n");
-    fprintf(flog , "   Source Port      : %u\n",ntohs(tcph->source));
-    fprintf(flog , "   Destination Port : %u\n",ntohs(tcph->dest));
-    fprintf(flog , "   Sequence Number    : %u\n",ntohl(tcph->seq));
-    fprintf(flog , "   Acknowledge Number : %u\n",ntohl(tcph->ack_seq));
-    fprintf(flog , "   Header Length      : %d BYTES\n" , (unsigned int)tcph->doff*4);
-       fprintf(flog , "   Flags (URG|ACK|PSH|RST|SYN|FIN)    : %d %d %d %d %d %d\n",(unsigned int)tcph->urg , (unsigned int)tcph->ack, (unsigned int)tcph->psh,(unsigned int)tcph->rst, (unsigned int)tcph->syn, (unsigned int)tcph->fin); 
-    fprintf(flog , "   Window         : %d\n",ntohs(tcph->window));
-    fprintf(flog , "   Checksum       : %d\n",ntohs(tcph->check));
-    fprintf(flog , "   Urgent Pointer : %d\n",tcph->urg_ptr);
- 
+    orig = ntohs(tcph->check);
+    unsigned short s = compute_tcp_checksum(iph,(unsigned short*)tcph);
+    fprintf(flog , "   Calculated Checksum       : %d\n",ntohs(s));
+     a = ntohs(s);
+
     char pr[50];
 
     if(ht)
@@ -378,9 +384,71 @@ void tcp_packet(unsigned char* buf, int size)
     tcpthern[cnt]->syn=tcph->syn;
     tcpthern[cnt]->fin=tcph->fin;
     tcpthern[cnt]->urg_ptr=tcph->urg_ptr;
+    free(tcpptr);
+}
 
+unsigned short compute_tcp_checksum(struct iphdr *pIph, unsigned short *ipPayload) 
+{
+    register unsigned long sum = 0;
+    unsigned short tcpLen = ntohs(pIph->tot_len) - (pIph->ihl<<2);
+    struct tcphdr *tcphdrp = (struct tcphdr*)(ipPayload);
+    sum += (pIph->saddr>>16)&0xFFFF;
+    sum += (pIph->saddr)&0xFFFF;
+    sum += (pIph->daddr>>16)&0xFFFF;
+    sum += (pIph->daddr)&0xFFFF;
+    sum += htons(IPPROTO_TCP);
+    sum += htons(tcpLen);
+    tcphdrp->check = 0;
 
+    while (tcpLen > 1) 
+    {
+        sum += * ipPayload++;
+        tcpLen -= 2;
+    }
 
+    if(tcpLen > 0) 
+    {
+        sum += ((*ipPayload)&htons(0xFF00));
+    }
+
+    while(sum>>16) 
+    {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+      sum = ~sum;
+    return (unsigned short)sum;
+}
+
+unsigned short compute_udp_checksum(struct iphdr *pIph, unsigned short *ipPayload) 
+{
+    register unsigned long sum = 0;
+    struct udphdr *udphdrp = (struct udphdr*)(ipPayload);
+    unsigned short udpLen = htons(udphdrp->len);
+    sum += (pIph->saddr>>16)&0xFFFF;
+    sum += (pIph->saddr)&0xFFFF;
+    sum += (pIph->daddr>>16)&0xFFFF;
+    sum += (pIph->daddr)&0xFFFF;
+    sum += htons(IPPROTO_UDP);
+    sum += udphdrp->len;
+    udphdrp->check = 0;
+
+    while (udpLen > 1) 
+    {
+        sum += * ipPayload++;
+        udpLen -= 2;
+    }
+
+    if(udpLen > 0) 
+    {
+        sum += ((*ipPayload)&htons(0xFF00));
+    }
+
+    while (sum>>16) 
+    {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    sum = ~sum;
+    return ((unsigned short)sum == 0x0000)?0xFFFF:(unsigned short)sum;
 }
 
 void analyze(unsigned char* buf, int size)
@@ -441,13 +509,14 @@ int raw_init (const char *device)
 
 void get_list()
 {
+	int i, j;
     int cur=0;
     int temp = 0;
-    for(int i=0;i<cnt;i++)
+    for(i=0;i<cnt;i++)
     {
         //printf("%s\n",Sour[i]);
         int flg=0;
-        for(int j=0;j<cur;j++)
+        for(j=0;j<cur;j++)
         {
             if(strcmp(Sour[i],tmp[j])==0)
             {
@@ -465,10 +534,10 @@ void get_list()
             cur++;
         }
     }
-    for(int i=0;i<cnt;i++)
+    for(i=0;i<cnt;i++)
     {
         int flg=0;
-        for(int j=0;j<cur;j++)
+        for(j=0;j<cur;j++)
         {
             if(strcmp(Dest[i],tmp[j])==0)
             {
@@ -486,7 +555,7 @@ void get_list()
             cur++;
         }
     }
-    for(int i=0;i<cur;i++)
+    for(i=0;i<cur;i++)
     {
         strcpy(tmp[i],"");
     }
@@ -505,8 +574,9 @@ void converse()
         scanf("%s",b);
         int port1,port2;
         int typ=0;
+        int i, j;
         
-        for(int i=0;i<tcp_count;i++)
+        for(i=0;i<tcp_count;i++)
         {
             
             if(strcmp(a,Sour[tcp_index[i]])==0&&strcmp(b,Dest[tcp_index[i]])==0)
@@ -515,7 +585,7 @@ void converse()
                 port1=por1[tcp_index[i]];
                 port2=por2[tcp_index[i]];
                 int flg=0;
-                for(int j=0;j<conp;j++)
+                for(j=0;j<conp;j++)
                 {
                     if(pot1[j]==port1&&pot2[j]==port2)
                     {
@@ -538,7 +608,7 @@ void converse()
                 port2=por1[tcp_index[i]];
                 port1=por2[tcp_index[i]];
                 int flg=0;
-                for(int j=0;j<conp;j++)
+                for(j=0;j<conp;j++)
                 {
                     if(pot1[j]==port1&&pot2[j]==port2)
                     {
@@ -556,7 +626,7 @@ void converse()
                 }
             }
         }
-        for(int i=0;i<udp_count;i++)
+        for(i=0;i<udp_count;i++)
         {
             if(strcmp(a,Sour[udp_index[i]])==0&&strcmp(b,Dest[udp_index[i]])==0)
             {
@@ -564,7 +634,7 @@ void converse()
                 port1=por1[tcp_index[i]];
                 port2=por2[tcp_index[i]];
                 int flg=0;
-                for(int j=0;j<conp;j++)
+                for(j=0;j<conp;j++)
                 {
                     if(pot1[j]==port1&&pot2[j]==port2)
                     {
@@ -587,7 +657,7 @@ void converse()
                 port2=por1[tcp_index[i]];
                 port1=por2[tcp_index[i]];
                 int flg=0;
-                for(int j=0;j<conp;j++)
+                for(j=0;j<conp;j++)
                 {
                     if(pot1[j]==port1&&pot2[j]==port2)
                     {
@@ -610,7 +680,7 @@ void converse()
         else
         {
             printf(ANSI_COLOR_MAGENTA"\n           IP 1             IP 2    PORT 1    PORT 2  TCP[1>2]   TCP[2>1]   UDP[1>2]   UDP[2>1]\n" ANSI_COLOR_RESET);   
-            for(int i=0;i<conp;i++)
+            for(i=0;i<conp;i++)
             {
                 printf("%15s  %15s  %8d  %8d  %8d  %9d  %9d  %9d\n",a,b,pot1[i],pot2[i],typr[i][0],typr[i][1],typr[i][2],typr[i][3]);
             }
@@ -655,6 +725,49 @@ void display_traffic()
     fclose(gnuplotPipe);
     system("eog traffic.png >/dev/null 2>&1");
 }
+
+void display_drop()
+{
+    printf("\nNumber of packets dropped %d\n",cntdrop);
+    printf("%% of packets dropped %lf\n",(double)cntdrop/cnt*100);
+    if(cntdrop == 0) return;
+    char * commandsForgnuplot[] = {"set grid","set terminal png","set output \'drop.png\'","set xlabel \'Time(s)\'","set ylabel \'Packets dropped per second\'","set title \'Packet drop graph\'", "set autoscale"
+,"plot \'data2.temp\' using 1:2 with lines title \'Packet drop graph\'","replot"};
+    
+    FILE * temp = fopen("data2.temp", "w");
+    
+
+    int num_packets = cntdrop;
+    double PART_T = 1;
+
+    double max_t = tmdrop[num_packets -1];
+    FILE * gnuplotPipe = popen ("gnuplot -persistent", "w");
+    int i,j;
+    j = 0;
+    int SIZ = (int) max_t/PART_T;
+    int num_freq[SIZ];
+    for(i = 0 ; i < SIZ;i++)
+        num_freq[i] = 0;
+    for (i=0; i < num_packets; i++)
+    {
+        int in = (int)(tmdrop[i]/PART_T);
+        num_freq[in]++;
+    }
+    double t = 0;
+    for(i=0 ; i < SIZ ; i++)
+    {   
+        fprintf(temp, "%lf %d\n", t, num_freq[i]);
+        t += PART_T;
+    }
+
+    fclose(temp);
+    for (i=0; i < 9; i++)
+       fprintf(gnuplotPipe, "%s \n", commandsForgnuplot[i]); 
+    
+    fclose(gnuplotPipe);
+    system("eog drop.png >/dev/null 2>&1");
+}
+
 
 void display_packlen()
 {
@@ -854,6 +967,10 @@ void filter()
         char a[50];
         scanf("%s",a);
         flog = fopen(a,"w");
+        ethernet *eptr;
+        ip_protocol* ipptr;
+        udp_protocol* udpptr;
+        tcp_protocol* tcpptr;
         if(ch1==1 && ch2==1)
         {
             for(i=0;i<tcp;i++)
@@ -861,9 +978,12 @@ void filter()
                 int v=tcp_index[i];
                 if(por1[v]==80||por1[v]==443||por2[v]==80||por2[v]==443)    
                 {
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_tcp_details(tcpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    tcpptr = get_tcp_details(tcpthern[v]);
+                    print_tcp_details(tcpptr);
                     fprintf(flog,"######################################");
                 }
             }
@@ -876,10 +996,12 @@ void filter()
                 int v=udp_index[i];
                 if(por1[v]==80||por1[v]==443||por2[v]==80||por2[v]==443)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    udpptr = get_udp_details(udpthern[v]);
+                    print_udp_details(udpptr);
                     fprintf(flog,"######################################");   
                 }
             }   
@@ -891,22 +1013,26 @@ void filter()
                 int v=udp_index[i];
                 if(por1[v]==80||por1[v]==443||por2[v]==80||por2[v]==443)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    udpptr = get_udp_details(udpthern[v]);
+                    print_udp_details(udpptr);
                     fprintf(flog,"######################################");
                 }
             }
-            for(int i=0;i<tcp;i++)
+            for(i=0;i<tcp;i++)
             {
                 int v=tcp_index[i];
                 if(por1[v]==80||por1[v]==443||por2[v]==80||por2[v]==443)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_tcp_details(tcpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    tcpptr = get_tcp_details(tcpthern[v]);
+                    print_tcp_details(tcpptr);
                     fprintf(flog,"######################################");
                 }
             } 
@@ -918,10 +1044,12 @@ void filter()
                 int v=tcp_index[i];
                 if(por1[v]==5353||por2[v]==5353)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_tcp_details(tcpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    tcpptr = get_tcp_details(tcpthern[v]);
+                    print_tcp_details(tcpptr);
                     fprintf(flog,"######################################");
                 }
             }
@@ -934,10 +1062,12 @@ void filter()
                 int v=udp_index[i];
                 if(por1[v]==5353||por2[v]==5353)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    udpptr = get_udp_details(udpthern[v]);
+                    print_udp_details(udpptr);
                     fprintf(flog,"######################################");
                 }
             }
@@ -949,10 +1079,12 @@ void filter()
                 int v=udp_index[i];
                 if(por1[v]==5353||por2[v]==5353)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
+                     eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    udpptr = get_udp_details(udpthern[v]);
+                    print_udp_details(udpptr);
                     fprintf(flog,"######################################");
                 }
             }
@@ -961,10 +1093,12 @@ void filter()
                 int v=tcp_index[i];
                 if(por1[v]==5353||por2[v]==5353)    
                 {
-
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_tcp_details(tcpthern[v]);
+                    eptr = get_ether_details(ethern[v]); 
+                    print_ether_details(eptr);
+                    ipptr = get_ip_details(ipthern[v]);
+                    print_ip_details(ipptr);
+                    tcpptr = get_tcp_details(tcpthern[v]);
+                    print_tcp_details(tcpptr);
                     fprintf(flog,"######################################");
                 }
             }
@@ -974,10 +1108,13 @@ void filter()
             for(i=0;i<tcp_count;i++)
             {
                 int v=tcp_index[i];
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
-                    fprintf(flog,"######################################");
+                eptr = get_ether_details(ethern[v]); 
+                print_ether_details(eptr);
+                ipptr = get_ip_details(ipthern[v]);
+                print_ip_details(ipptr);
+                tcpptr = get_tcp_details(tcpthern[v]);
+                print_tcp_details(tcpptr);
+                fprintf(flog,"######################################");
             }
         }
         else if(ch1==3&&ch2==2)
@@ -985,10 +1122,13 @@ void filter()
             for(i=0;i<udp_count;i++)
             {
                 int v=udp_index[i];
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
-                    fprintf(flog,"######################################");
+                eptr = get_ether_details(ethern[v]); 
+                print_ether_details(eptr);
+                ipptr = get_ip_details(ipthern[v]);
+                print_ip_details(ipptr);
+                udpptr = get_udp_details(udpthern[v]);
+                print_udp_details(udpptr);
+                fprintf(flog,"######################################");
             }
         }
         else if(ch1==3&&ch2==3)
@@ -996,20 +1136,29 @@ void filter()
             for(i=0;i<udp_count;i++)
             {
                 int v=udp_index[i];
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_udp_details(udpthern[v]);
-                    fprintf(flog,"######################################");
+                eptr = get_ether_details(ethern[v]); 
+                print_ether_details(eptr);
+                ipptr = get_ip_details(ipthern[v]);
+                print_ip_details(ipptr);
+                udpptr = get_udp_details(udpthern[v]);
+                print_udp_details(udpptr);
+                fprintf(flog,"######################################");
             }
             for(i=0;i<tcp_count;i++)
             {
                 int v=tcp_index[i];
-                    print_ether_details(ethern[v]);
-                    print_ip_details(ipthern[v]);
-                    print_tcp_details(tcpthern[v]);
-                    fprintf(flog,"######################################");
+                eptr = get_ether_details(ethern[v]); 
+                print_ether_details(eptr);
+                ipptr = get_ip_details(ipthern[v]);
+                print_ip_details(ipptr);
+                tcpptr = get_tcp_details(tcpthern[v]);
+                print_tcp_details(tcpptr);
+                fprintf(flog,"######################################");
             }   
         }
         fclose(flog);
+        free(eptr);
+        free(ipptr);
+        free(udpptr);
     }
 }
